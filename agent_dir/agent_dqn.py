@@ -20,10 +20,8 @@ class Agent_DQN(Agent):
 
     def init_game_setting(self):
         """
-
         Testing function will call this function at the begining of new game
         Put anything you want to initialize if necessary
-
         """
         ##################
         # YOUR CODE HERE #
@@ -44,11 +42,9 @@ class Agent_DQN(Agent):
     def make_action(self, observation, test=True):
         """
         Return predicted action of your agent
-
         Input:
             observation: np.array
                 stack 4 last preprocessed frames, shape: (84, 84, 4)
-
         Return:
             action: int
                 the predicted action from trained model
@@ -57,4 +53,3 @@ class Agent_DQN(Agent):
         # YOUR CODE HERE #
         ##################
         return self.env.get_random_action()
-
