@@ -235,10 +235,10 @@ class Agent_DQN(Agent):
       # "state" is also known as "observation"
       obs = self.env.reset() #(84, 84, 4)
       total_loss = 0
-      s = 0
+
       for s in range(self.args.max_num_steps):
         # self.env.env.render()
-        action = self.make_action(obs, test=False)
+        action = self.make_action(obs, test=False) # Performing the same action for 4 frames?
         obs_, reward, done, info = self.env.step(action)
         self.storeTransition(obs, action, reward, obs_, done)
         self.step = self.sess.run(self.add_global)
@@ -292,7 +292,7 @@ class Agent_DQN(Agent):
         action: int
             the predicted action from trained model
             """
-    state = observation.reshape((1,84,84,4))
+    state = observation.reshape((1, 84, 84, 4))
     q_value = self.sess.run(self.q_eval, feed_dict={self.s: state})[0]
 
     if test:
