@@ -9,17 +9,16 @@ def add_arguments(parser):
     '''
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--replay_size', type=int, default=10000)
-    parser.add_argument('--update_time', type=int, default=100)
+    parser.add_argument('--update_time', type=int, default=10000)
     parser.add_argument('--gamma_reward_decay', type=float, default=0.95)
     parser.add_argument('--observe_steps', type=int, default=50000)
     parser.add_argument('--anneal_rate', type=int, default=1000000)
     parser.add_argument('--max_num_steps', type=int, default=10000)
     parser.add_argument('--num_episodes', type=int, default=100000)
-    parser.add_argument('--num_test_episodes', type=int, default=5)
-    parser.add_argument('--num_eval', type=int, default=5)
+    parser.add_argument('--num_test_episodes', type=int, default=100)
+    parser.add_argument('--num_eval', type=int, default=100)
     parser.add_argument('--learning_rate', type=float, default=1e-4)
     parser.add_argument('--epsilon_start', type=float, default=0.95)
     parser.add_argument('--epsilon_end', type=float, default=0.5)
-    parser.add_argument('--reward_decay', type=float, default=0.9)    
 
     return parser

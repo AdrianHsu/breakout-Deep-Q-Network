@@ -1,5 +1,6 @@
 from agent_dir.agent import Agent
 from colors import *
+from tqdm import *
 from collections import deque
 
 import tensorflow as tf
@@ -52,11 +53,6 @@ class Agent_DQN(Agent):
     self.replay_memory = deque()
 
     self.sess = tf.Session(config=gpu_config)
-
-    if tf.gfile.Exists("logs/"):
-      print('remove logs/')
-      tf.gfile.DeleteRecursively("logs/")
-    tf.gfile.MakeDirs("logs/")
 
     self.summary_writer = tf.summary.FileWriter("logs/", graph=self.sess.graph)
     self.sess.run(tf.global_variables_initializer())
@@ -143,7 +139,8 @@ class Agent_DQN(Agent):
   def buildOptimizer(self):
     with tf.variable_scope('loss'):
       q_actions = tf.reduce_sum(tf.multiply(self.q_eval, self.action_input), reduction_indices=1)
-      self.loss = tf.reduce_mean(tf.squared_difference(self.y_input, q_actions, name='td_error'))
+      # self.loss = tf.reduce_mean(tf.squared_difference(self.y_input, q_actions, name='td_error'))
+      self.loss = tf.reduce_mean(tf.square(self.y_input - q_actions))
       self.train_summary = tf.summary.scalar('loss', self.loss)
       tf.summary.merge_all()
     with tf.variable_scope('train'):
@@ -196,29 +193,28 @@ class Agent_DQN(Agent):
       self.y_input: q_eval_storage,
       self.action_input: action_batch
       }, options=run_options)
-    # print('loss: ', loss);
 
     if self.step % self.args.update_time == 0:
       self.summary_writer.add_summary(summary, global_step=self.step)
       self.sess.run(self.replace_target_op)
-      # print('target_params_replaced')
+      print('target_params_replaced...')
 
   def train(self):
 
     """
     Implement your training algorithm here
     """
-
-    for episode in range(self.args.num_episodes):
+    pbar = tqdm(range(self.args.num_episodes))
+    total_eval_reward = 0
+    avg_reward = 0
+    for episode in pbar:
       # print('episode: ', episode)
       # "state" is also known as "observation"
       obs = self.env.reset() #(84, 84, 4)
-      rewards = 0
       for s in range(self.args.max_num_steps):
         # self.env.env.render()
         action = self.make_action(obs, test=False)
         obs_, reward, done, info = self.env.step(action)
-        rewards += reward
         self.storeTransition(obs, action, reward, obs_, done)
         self.step += 1
         if len(self.replay_memory) > self.args.replay_size:
@@ -228,25 +224,26 @@ class Agent_DQN(Agent):
           self.learn()
         
         obs = obs_
-
         if done:
           break
 
       if episode % self.args.num_eval == 0:
-        total_reward = 0
+        total_eval_reward = 0
         for i in range(self.args.num_test_episodes):
           obs = self.env.reset()
           # self.env.env.render()
-          action = self.make_action(obs, test=True)
-          obs_, reward, done, info = self.env.step(action)
-          total_reward += reward
-          if done:
-            break
-        avg_reward = total_reward / self.args.num_test_episodes
-        print('episode: ', episode, ', eval average reward: ', avg_reward)
-        if avg_reward >= 40.0: # baseline
+          for j in range(self.args.max_num_steps):
+            action = self.make_action(obs, test=True)
+            obs_, reward, done, info = self.env.step(action)
+            total_eval_reward += reward
+            if done:
+              break
+        avg_reward = total_eval_reward / float(self.args.num_test_episodes)
+        print("Avg Reward(100 eps): " + "{:.4f}".format(total_eval_reward))
+        if avg_reward > 40.0: # baseline
           print('baseline passed!')
           break
+      pbar.set_description('Epsilon: ' + "{:.2f}".format(self.epsilon) + ", Gamma: " + "{:.2f}".format(self.gamma) + ", lr: " + "{:.6f}".format(self.lr))
 
     print('game over')
     # env.destroy()
