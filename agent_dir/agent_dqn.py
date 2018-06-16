@@ -20,7 +20,6 @@ class Agent_DQN(Agent):
     Initialize every things you need here.
     For example: building your model
     """
-
     super(Agent_DQN,self).__init__(env)
     self.args = args
     self.batch_size = args.batch_size
@@ -28,6 +27,8 @@ class Agent_DQN(Agent):
     self.gamma = args.gamma_reward_decay
     self.n_actions = env.action_space.n # = 4
     self.state_dim = env.observation_space.shape[0] # 84
+    self.global_step = tf.Variable(0, trainable=False)
+    self.add_global = self.global_step.assign_add(1)
     self.step = 0
 
     if args.test_dqn:
@@ -52,19 +53,33 @@ class Agent_DQN(Agent):
     self.epsilon = self.args.epsilon_start
     self.replay_memory = deque()
 
+    self.ckpts_path = self.args.save_dir + "dqn.ckpt"
+    self.saver = tf.train.Saver(max_to_keep = 3)
     self.sess = tf.Session(config=gpu_config)
 
     self.summary_writer = tf.summary.FileWriter("logs/", graph=self.sess.graph)
-    self.sess.run(tf.global_variables_initializer())
+
+    self.init()
+
+  def init(self):
+    ckpt = tf.train.get_checkpoint_state(self.args.save_dir)
+    print(ckpt)
+    if self.args.load_saver and ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+        print('Reloading model parameters..')
+        self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+        #model_eval.saver.restore(eval_sess, ckpt.model_checkpoint_path)
+        print(ckpt.model_checkpoint_path)
+        self.step = self.sess.run(self.global_step)
+        print('load step: ', self.step)
+    else:
+        print('Created new model parameters..')
+        self.sess.run(tf.global_variables_initializer())
 
   def init_game_setting(self):
     """
     Testing function will call this function at the begining of new game
     Put anything you want to initialize if necessary
     """
-    ##################
-    # YOUR CODE HERE #
-    ##################
     pass
 
   def build_net(self, s, var_scope):
@@ -139,8 +154,7 @@ class Agent_DQN(Agent):
   def buildOptimizer(self):
     with tf.variable_scope('loss'):
       q_actions = tf.reduce_sum(tf.multiply(self.q_eval, self.action_input), reduction_indices=1)
-      # self.loss = tf.reduce_mean(tf.squared_difference(self.y_input, q_actions, name='td_error'))
-      self.loss = tf.reduce_mean(tf.square(self.y_input - q_actions))
+      self.loss = tf.reduce_mean(tf.squared_difference(self.y_input, q_actions, name='td_error'))
       self.train_summary = tf.summary.scalar('loss', self.loss)
       tf.summary.merge_all()
     with tf.variable_scope('train'):
@@ -177,27 +191,32 @@ class Agent_DQN(Agent):
     q_eval_batch = self.sess.run(self.q_target, 
       feed_dict={self.s_: next_state_batch})
 
-    q_eval_storage = []
+    y_batch = []
 
     for i in range(self.batch_size):
       done = done_batch[i]
       if done:
-        q_eval_storage.append(reward_batch[i])
+        y_batch.append(reward_batch[i])
       else:
-        q = reward_batch[i] + self.gamma * np.max(q_eval_batch[i])
-        q_eval_storage.append(q)
+        y = reward_batch[i] + self.gamma * np.max(q_eval_batch[i])
+        y_batch.append(y)
 
     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
     _, summary, loss = self.sess.run([self.logits, self.train_summary, self.loss], feed_dict={
       self.s: state_batch,
-      self.y_input: q_eval_storage,
+      self.y_input: y_batch,
       self.action_input: action_batch
       }, options=run_options)
 
-    if self.step % self.args.update_time == 0:
+    if self.step % self.args.print_time == 0:
       self.summary_writer.add_summary(summary, global_step=self.step)
+
+    if self.step % self.args.update_time == 0:
       self.sess.run(self.replace_target_op)
-      print('target_params_replaced...')
+      ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
+      print(color("\n[target params replaced] Saver saved: " + ckpt_path, fg='white', bg='green', style='bold'))
+
+    return loss
 
   def train(self):
 
@@ -206,28 +225,36 @@ class Agent_DQN(Agent):
     """
     pbar = tqdm(range(self.args.num_episodes))
     total_eval_reward = 0
-    avg_reward = 0
+    current_step = 0
+    current_loss = 0
+    file_loss = open("loss.csv", "a")
+    file_loss.write("episode,step,reward,loss\n")
     for episode in pbar:
       # print('episode: ', episode)
       # "state" is also known as "observation"
       obs = self.env.reset() #(84, 84, 4)
+      total_loss = 0
+      s = 0
       for s in range(self.args.max_num_steps):
         # self.env.env.render()
         action = self.make_action(obs, test=False)
         obs_, reward, done, info = self.env.step(action)
         self.storeTransition(obs, action, reward, obs_, done)
-        self.step += 1
+        self.step = self.sess.run(self.add_global)
         if len(self.replay_memory) > self.args.replay_size:
           self.replay_memory.popleft()
         # once the storage stored > batch_size, start training
         if len(self.replay_memory) > self.batch_size:
-          self.learn()
-        
+          loss = self.learn()
+          total_loss += loss
+
         obs = obs_
         if done:
           break
 
-      if episode % self.args.num_eval == 0:
+      if episode % self.args.num_eval == 0 and episode != 0:
+        current_loss = total_loss
+        current_step = self.step
         total_eval_reward = 0
         for i in range(self.args.num_test_episodes):
           obs = self.env.reset()
@@ -239,11 +266,14 @@ class Agent_DQN(Agent):
             if done:
               break
         avg_reward = total_eval_reward / float(self.args.num_test_episodes)
-        print("Avg Reward(100 eps): " + "{:.4f}".format(total_eval_reward))
+        file_loss.write(str(episode) + "," + str(current_step) + "," + "{:.2f}".format(avg_reward) + "," + "{:.4f}".format(current_loss) + "\n")
+        file_loss.flush()
+
+        print(color("\nAvg Reward(100 eps): " + "{:.2f}".format(avg_reward), fg='white', bg='orange'))
         if avg_reward > 40.0: # baseline
           print('baseline passed!')
           break
-      pbar.set_description('Epsilon: ' + "{:.2f}".format(self.epsilon) + ", Gamma: " + "{:.2f}".format(self.gamma) + ", lr: " + "{:.6f}".format(self.lr))
+      pbar.set_description("Gamma: " + "{:.2f}".format(self.gamma) + ', Epsilon: ' + "{:.4f}".format(self.epsilon) + ", lr: " + "{:.4f}".format(self.lr) + ", Step: " + str(current_step) + ", Loss: " + "{:.4f}".format(current_loss))
 
     print('game over')
     # env.destroy()
