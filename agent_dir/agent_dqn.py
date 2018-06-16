@@ -210,11 +210,12 @@ class Agent_DQN(Agent):
 
     if self.step % self.args.print_time == 0:
       self.summary_writer.add_summary(summary, global_step=self.step)
-
-    if self.step % self.args.update_time == 0:
-      self.sess.run(self.replace_target_op)
       ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
-      print(color("\n[target params replaced] Saver saved: " + ckpt_path, fg='white', bg='green', style='bold'))
+      print(color("\nSaver saved: " + ckpt_path, fg='white', bg='blue', style='bold'))
+
+    if self.step % self.args.update_target == 0:
+      self.sess.run(self.replace_target_op)
+      print(color("\n[target params replaced]", fg='white', bg='green', style='bold'))
 
     return loss
 
@@ -241,12 +242,13 @@ class Agent_DQN(Agent):
         obs_, reward, done, info = self.env.step(action)
         self.storeTransition(obs, action, reward, obs_, done)
         self.step = self.sess.run(self.add_global)
-        if len(self.replay_memory) > self.args.replay_size:
+        if len(self.replay_memory) > self.args.replay_memory_size:
           self.replay_memory.popleft()
         # once the storage stored > batch_size, start training
         if len(self.replay_memory) > self.batch_size:
-          loss = self.learn()
-          total_loss += loss
+          if self.step % self.args.update_eval == 0:
+            loss = self.learn()
+            total_loss += loss
 
         obs = obs_
         if done:
@@ -270,11 +272,11 @@ class Agent_DQN(Agent):
         file_loss.flush()
 
         print(color("\nAvg Reward(100 eps): " + "{:.2f}".format(avg_reward), fg='white', bg='orange'))
-        if avg_reward > 40.0: # baseline
-          print('baseline passed!')
-          ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
-          print(color("\n Saver saved: " + ckpt_path, fg='white', bg='green', style='bold'))
-          break
+        # if avg_reward > 40.0: # baseline
+        #   print('baseline passed!')
+        #   ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
+        #   print(color("\n Saver saved: " + ckpt_path, fg='white', bg='green', style='bold'))
+        #   break
       pbar.set_description("Gamma: " + "{:.2f}".format(self.gamma) + ', Epsilon: ' + "{:.4f}".format(self.epsilon) + ", lr: " + "{:.4f}".format(self.lr) + ", Step: " + str(current_step) + ", Loss: " + "{:.4f}".format(current_loss))
 
     print('game over')
