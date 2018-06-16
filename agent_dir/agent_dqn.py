@@ -57,7 +57,7 @@ class Agent_DQN(Agent):
     self.saver = tf.train.Saver(max_to_keep = 3)
     self.sess = tf.Session(config=gpu_config)
 
-    self.summary_writer = tf.summary.FileWriter("logs/", graph=self.sess.graph)
+    self.summary_writer = tf.summary.FileWriter(self.args.log_dir, graph=self.sess.graph)
 
     self.init()
 
@@ -272,6 +272,8 @@ class Agent_DQN(Agent):
         print(color("\nAvg Reward(100 eps): " + "{:.2f}".format(avg_reward), fg='white', bg='orange'))
         if avg_reward > 40.0: # baseline
           print('baseline passed!')
+          ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
+          print(color("\n Saver saved: " + ckpt_path, fg='white', bg='green', style='bold'))
           break
       pbar.set_description("Gamma: " + "{:.2f}".format(self.gamma) + ', Epsilon: ' + "{:.4f}".format(self.epsilon) + ", lr: " + "{:.4f}".format(self.lr) + ", Step: " + str(current_step) + ", Loss: " + "{:.4f}".format(current_loss))
 

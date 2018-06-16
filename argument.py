@@ -13,6 +13,7 @@ def add_arguments(parser):
     parser.add_argument('--print_time', type=int, default=2500)
     parser.add_argument('--load_saver', type=int, default=0)
     parser.add_argument('--save_dir', type=str, default='save/')
+    parser.add_argument('--log_dir', type=str, default='logs/')    
     parser.add_argument('--gamma_reward_decay', type=float, default=0.9)
     parser.add_argument('--observe_steps', type=int, default=50000)
     parser.add_argument('--anneal_rate', type=int, default=1000000)
