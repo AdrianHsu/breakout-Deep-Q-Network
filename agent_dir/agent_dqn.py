@@ -266,6 +266,7 @@ class Agent_DQN(Agent):
         episode_reward += reward
         self.storeTransition(obs, action, reward, obs_, done)
         self.step = self.sess.run(self.add_global)
+        
         if len(self.replay_memory) > self.args.replay_memory_size:
           self.replay_memory.popleft()
         # once the storage stored > batch_size, start training
@@ -274,14 +275,15 @@ class Agent_DQN(Agent):
             loss = self.learn()
             train_loss += loss
 
+        if self.step % self.args.saver_steps == 0 and episode != 0:
+          ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.step)
+          print(color("\nStep: " + str(self.step) + ", Saver saved: " + ckpt_path, fg='white', bg='blue', style='bold'))
+
         obs = obs_
         if done:
           break
       train_rewards.append(episode_reward)
       train_episode_len += s
-      if self.step % self.args.saver_steps == 0 and episode != 0:
-        ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.step)
-        print(color("\nStep: " + str(self.step) + ", Saver saved: " + ckpt_path, fg='white', bg='blue', style='bold'))
 
       if episode % self.args.num_eval == 0 and episode != 0:
         current_loss = train_loss
