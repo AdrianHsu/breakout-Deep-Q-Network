@@ -296,7 +296,7 @@ class Agent_DQN(Agent):
         #   print(color("\n Saver saved: " + ckpt_path, fg='white', bg='green', style='bold'))
         #   break
 
-      pbar.set_description(self.stage + " Gamma: " + "{:.2f}".format(self.gamma) + ', Epsilon: ' + "{:.4f}".format(self.epsilon) + ", lr: " + "{:.6f}".format(self.lr) + ", Step: " + str(current_step) + ", Loss: " + "{:.4f}".format(current_loss))
+      pbar.set_description(self.stage + " Gamma: " + "{:.2f}".format(self.gamma) + ', Epsilon: ' + "{:.4f}".format(self.epsilon) + ", len(deque): " + str(len(self.replay_memory)) + ", Step: " + str(current_step) + ", Loss: " + "{:.4f}".format(current_loss))
 
     print('game over')
     # env.destroy()
