@@ -232,10 +232,8 @@ class Agent_DQN(Agent):
       self.action_input: action_batch
       }, options=run_options)
 
-    if self.step % self.args.print_time == 0:
+    if self.step % self.args.summary_time == 0:
       self.summary_writer.add_summary(summary, global_step=self.step)
-      ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
-      print(color("\nSaver saved: " + ckpt_path, fg='white', bg='blue', style='bold'))
 
     if self.step % self.args.update_target == 0 and self.step > self.args.observe_steps:
       self.sess.run(self.replace_target_op)
@@ -249,23 +247,23 @@ class Agent_DQN(Agent):
     Implement your training algorithm here
     """
     pbar = tqdm(range(self.args.num_episodes))
-    total_eval_reward = 0
-    current_step = 0
     current_loss = 0
+    train_rewards = []
+    train_episode_len = 0.0
     file_loss = open("loss.csv", "a")
     file_loss.write("episode,step,reward,loss\n")
     for episode in pbar:
       # print('episode: ', episode)
       # "state" is also known as "observation"
       obs = self.env.reset() #(84, 84, 4)
-      total_loss = 0
-      train_total_reward = 0.0
-      train_episode_len = 0.0
+      train_loss = 0
+      
+      episode_reward = 0.0
       for s in range(self.args.max_num_steps):
         # self.env.env.render()
         action = self.make_action(obs, test=False) # Performing the same action for 4 frames?
         obs_, reward, done, info = self.env.step(action)
-        train_total_reward += reward
+        episode_reward += reward
         self.storeTransition(obs, action, reward, obs_, done)
         self.step = self.sess.run(self.add_global)
         if len(self.replay_memory) > self.args.replay_memory_size:
@@ -274,18 +272,18 @@ class Agent_DQN(Agent):
         if len(self.replay_memory) > self.batch_size:
           if self.step % self.args.update_eval == 0:
             loss = self.learn()
-            total_loss += loss
+            train_loss += loss
 
         obs = obs_
         if done:
           break
+      train_rewards.append(episode_reward)
       train_episode_len += s
 
       if episode % self.args.num_eval == 0 and episode != 0:
-        current_loss = total_loss
-        current_step = self.step
-        total_episode_len = 0
-        rewards = []
+        current_loss = train_loss
+        test_episode_len = 0
+        test_rewards = []
         for i in range(self.args.num_test_episodes):
           obs = self.env.reset()
           self.init_game_setting()
@@ -300,22 +298,29 @@ class Agent_DQN(Agent):
             episode_len += 1
             if done:
               break
-          rewards.append(episode_reward)
-          total_episode_len += j
+          test_rewards.append(episode_reward)
+          test_episode_len += j
 
-        avg_reward = np.mean(rewards)
-        avg_episode_len = total_episode_len / float(self.args.num_test_episodes)
-        file_loss.write(str(episode) + "," + str(current_step) + "," + "{:.2f}".format(avg_reward) + "," + "{:.4f}".format(current_loss) + "\n")
+        avg_reward_train = np.mean(train_rewards)
+        train_rewards = []
+        avg_episode_len_train = train_episode_len / float(self.args.num_eval)
+        train_episode_len = 0.0
+
+        avg_reward = np.mean(test_rewards)
+        avg_episode_len = test_episode_len / float(self.args.num_test_episodes)
+        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.2f}".format(avg_reward) + "," + "{:.4f}".format(current_loss) + "\n")
         file_loss.flush()
-
-        print(color("\nAvg Reward(100 eps): " + "{:.2f}".format(avg_reward) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len), fg='white', bg='orange'))
+        print(color("\n[Train] Avg Reward(300 eps): " + "{:.2f}".format(avg_reward_train) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len_train), fg='red', bg='white'))
+        print(color("\n[Test]  Avg Reward(100 eps): " + "{:.2f}".format(avg_reward) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len), fg='white', bg='orange'))
+        ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
+        print(color("\nSaver saved: " + ckpt_path, fg='white', bg='blue', style='bold'))
         # if avg_reward > 40.0: # baseline
         #   print('baseline passed!')
         #   ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
         #   print(color("\n Saver saved: " + ckpt_path, fg='white', bg='green', style='bold'))
         #   break
 
-      pbar.set_description(self.stage + " Gam: " + "{:.2f}".format(self.gamma) + ', Eps: ' + "{:.4f}".format(self.epsilon) + ", Rew: " + str(train_total_reward) + ", Len: " + str(train_episode_len) + ", Step: " + str(current_step) + ", L: " + "{:.4f}".format(current_loss))
+      pbar.set_description(self.stage + " Gamma: " + "{:.2f}".format(self.gamma) + ', Epsilon: ' + "{:.4f}".format(self.epsilon) + ", Loss: " + "{:.4f}".format(current_loss) + ", Step: " + str(self.step))
 
     print('game over')
     # env.destroy()
@@ -332,7 +337,6 @@ class Agent_DQN(Agent):
             """
     state = observation.reshape((1, 84, 84, 4))
     q_value = self.sess.run(self.q_eval, feed_dict={self.s: state})[0]
-
     if test:
       if random.random() <= 0.01:
         return random.randrange(self.n_actions)
