@@ -51,8 +51,8 @@ class Agent_DQN(Agent):
     
     self.train_summary = []
     self.buildOptimizer()
-    t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_net')
-    e_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='eval_net')
+    self.t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_net')
+    self.e_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='eval_net')
 
     self.replace_target_op = [tf.assign(t, e) for t, e in zip(t_params, e_params)] 
 

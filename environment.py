@@ -11,6 +11,7 @@ from atari_wrapper import make_wrap_atari
 class Environment(object):
     def __init__(self, env_name, args, atari_wrapper=False, test=False):
         if atari_wrapper:
+            #clip_rewards = True
             clip_rewards = not test
             self.env = make_wrap_atari(env_name, clip_rewards)
         else:
