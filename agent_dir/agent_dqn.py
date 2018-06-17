@@ -54,7 +54,7 @@ class Agent_DQN(Agent):
     self.t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_net')
     self.e_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='eval_net')
 
-    self.replace_target_op = [tf.assign(t, e) for t, e in zip(t_params, e_params)] 
+    self.replace_target_op = [tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)] 
 
     self.epsilon = self.args.epsilon_start
     self.replay_memory = deque()
