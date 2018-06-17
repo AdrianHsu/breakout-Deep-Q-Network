@@ -12,8 +12,12 @@ random.seed(0)
 np.random.seed(0)
 tf.set_random_seed(0)
 
-gpu_config = tf.ConfigProto()
-gpu_config.gpu_options.allow_growth = True
+config = tf.ConfigProto()
+# config.gpu_options.allow_growth = True
+config.gpu_options.per_process_gpu_memory_fraction = 0.33
+config.intra_op_parallelism_threads = 44 # cpu
+config.inter_op_parallelism_threads = 44 # cpu
+print(config)
 stages = ["[OBSERVE]", "[EXPLORE]", "[TRAIN]"]
 
 class Agent_DQN(Agent):
@@ -60,7 +64,7 @@ class Agent_DQN(Agent):
 
     self.ckpts_path = self.args.save_dir + "dqn.ckpt"
     self.saver = tf.train.Saver(max_to_keep = 3)
-    self.sess = tf.Session(config=gpu_config)
+    self.sess = tf.Session(config=config)
     
     self.summary_writer = tf.summary.FileWriter(self.args.log_dir, graph=self.sess.graph)
 
@@ -127,7 +131,7 @@ class Agent_DQN(Agent):
     return fc2
 
   def init_W(self, shape, name='weights', 
-    w_initializer=tf.truncated_normal_initializer(0, 1e-1)):
+    w_initializer=tf.truncated_normal_initializer(0, 1e-2)):
 
     return tf.get_variable(
       name=name,
@@ -135,7 +139,7 @@ class Agent_DQN(Agent):
       initializer=w_initializer)
 
   def init_b(self, shape, name='biases', 
-    b_initializer = tf.constant_initializer(1e-1)):
+    b_initializer = tf.constant_initializer(1e-2)):
 
     return tf.get_variable(
       name=name,
