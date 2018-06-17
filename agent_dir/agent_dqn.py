@@ -11,8 +11,10 @@ import random
 random.seed(0)
 np.random.seed(0)
 tf.set_random_seed(0)
+
 gpu_config = tf.ConfigProto()
 gpu_config.gpu_options.allow_growth = True
+stages = ["[OBSERVE]", "[EXPLORE]", "[TRAIN]"]
 
 class Agent_DQN(Agent):
   def __init__(self, env, args):
@@ -30,6 +32,7 @@ class Agent_DQN(Agent):
     self.global_step = tf.Variable(0, trainable=False)
     self.add_global = self.global_step.assign_add(1)
     self.step = 0
+    self.stage = ""
 
     if args.test_dqn:
       #you can load your model here
@@ -42,8 +45,10 @@ class Agent_DQN(Agent):
     self.y_input = tf.placeholder(tf.float32, [None]) 
     self.action_input = tf.placeholder(tf.float32, [None, self.n_actions])
 
-    self.q_eval = self.build_net(self.s, 'eval_net')
-    self.q_target = self.build_net(self.s_, 'target_net')
+    self.q_eval = self.build_net(self.s, 'eval_net') # online Q
+    self.q_target = self.build_net(self.s_, 'target_net') # target Q
+    
+    self.train_summary = []
     self.buildOptimizer()
     t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_net')
     e_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='eval_net')
@@ -56,7 +61,7 @@ class Agent_DQN(Agent):
     self.ckpts_path = self.args.save_dir + "dqn.ckpt"
     self.saver = tf.train.Saver(max_to_keep = 3)
     self.sess = tf.Session(config=gpu_config)
-
+    
     self.summary_writer = tf.summary.FileWriter(self.args.log_dir, graph=self.sess.graph)
 
     self.init()
@@ -153,10 +158,12 @@ class Agent_DQN(Agent):
 
   def buildOptimizer(self):
     with tf.variable_scope('loss'):
-      q_actions = tf.reduce_sum(tf.multiply(self.q_eval, self.action_input), reduction_indices=1)
-      self.loss = tf.reduce_mean(tf.squared_difference(self.y_input, q_actions, name='td_error'))
-      self.train_summary = tf.summary.scalar('loss', self.loss)
-      tf.summary.merge_all()
+      self.q_action = tf.reduce_sum(tf.multiply(self.q_eval, self.action_input), reduction_indices=1)
+      self.train_summary.append(tf.summary.scalar('Q', 
+        tf.reduce_sum(self.q_action)))
+      self.loss = tf.reduce_mean(tf.square(self.y_input - self.q_action))
+      self.train_summary.append(tf.summary.scalar('loss', self.loss))
+      self.train_summary = tf.summary.merge(self.train_summary)
     with tf.variable_scope('train'):
       self.logits = tf.train.RMSPropOptimizer(self.lr).minimize(self.loss)
 
@@ -177,6 +184,13 @@ class Agent_DQN(Agent):
     """
     one_hot_action = np.zeros(self.n_actions)
     one_hot_action[action] = 1
+    if self.step == 0:
+      self.stage = stages[0]
+    elif self.step == self.args.observe_steps:
+      self.stage = stages[1]
+    elif self.step == self.args.observe_steps + self.args.explore_steps:
+      self.stage = stages[2]
+
     self.replay_memory.append((s, one_hot_action, reward, s_, done))
 
   def learn(self):
@@ -213,7 +227,7 @@ class Agent_DQN(Agent):
       ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
       print(color("\nSaver saved: " + ckpt_path, fg='white', bg='blue', style='bold'))
 
-    if self.step % self.args.update_target == 0:
+    if self.step % self.args.update_target == 0 and self.step > self.args.observe_steps:
       self.sess.run(self.replace_target_op)
       print(color("\n[target params replaced]", fg='white', bg='green', style='bold'))
 
@@ -277,7 +291,8 @@ class Agent_DQN(Agent):
         #   ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
         #   print(color("\n Saver saved: " + ckpt_path, fg='white', bg='green', style='bold'))
         #   break
-      pbar.set_description("Gamma: " + "{:.2f}".format(self.gamma) + ', Epsilon: ' + "{:.4f}".format(self.epsilon) + ", lr: " + "{:.4f}".format(self.lr) + ", Step: " + str(current_step) + ", Loss: " + "{:.4f}".format(current_loss))
+
+      pbar.set_description(self.stage + " Gamma: " + "{:.2f}".format(self.gamma) + ', Epsilon: ' + "{:.4f}".format(self.epsilon) + ", lr: " + "{:.6f}".format(self.lr) + ", Step: " + str(current_step) + ", Loss: " + "{:.4f}".format(current_loss))
 
     print('game over')
     # env.destroy()
@@ -296,9 +311,12 @@ class Agent_DQN(Agent):
     q_value = self.sess.run(self.q_eval, feed_dict={self.s: state})[0]
 
     if test:
-      return np.argmax(q_value)
+      if random.random() <= 0.01:
+        return random.randrange(self.n_actions)
+      else:
+        return np.argmax(q_value)
 
-    if random.random() <= self.epsilon and not test:
+    if random.random() <= self.epsilon:
       action = random.randrange(self.n_actions)
     else:
       action = np.argmax(q_value)
@@ -307,7 +325,7 @@ class Agent_DQN(Agent):
         and self.step > self.args.observe_steps:
       old_e = self.epsilon
       interval = self.args.epsilon_start - self.args.epsilon_end
-      self.epsilon -= interval / float(self.args.anneal_rate)
+      self.epsilon -= interval / float(self.args.explore_steps)
       # print('epsilon: ', old_e, ' -> ', self.epsilon)
 
     return action
