@@ -20,6 +20,7 @@ def add_arguments(parser):
     parser.add_argument('--explore_steps', type=int, default=500000)
     parser.add_argument('--max_num_steps', type=int, default=10000)
     parser.add_argument('--num_episodes', type=int, default=50000)
+    parser.add_argument('--saver_steps', type=int, default=25000)
     parser.add_argument('--num_test_episodes', type=int, default=100)
     parser.add_argument('--num_eval', type=int, default=300)
     parser.add_argument('--learning_rate', type=float, default=0.00025)

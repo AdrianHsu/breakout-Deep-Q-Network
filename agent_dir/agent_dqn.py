@@ -279,6 +279,9 @@ class Agent_DQN(Agent):
           break
       train_rewards.append(episode_reward)
       train_episode_len += s
+      if self.step % self.args.saver_steps == 0 and episode != 0:
+        ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.step)
+        print(color("\nStep: " + str(self.step) + ", Saver saved: " + ckpt_path, fg='white', bg='blue', style='bold'))
 
       if episode % self.args.num_eval == 0 and episode != 0:
         current_loss = train_loss
@@ -312,8 +315,7 @@ class Agent_DQN(Agent):
         file_loss.flush()
         print(color("\n[Train] Avg Reward(300 eps): " + "{:.2f}".format(avg_reward_train) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len_train), fg='red', bg='white'))
         print(color("\n[Test]  Avg Reward(100 eps): " + "{:.2f}".format(avg_reward) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len), fg='white', bg='orange'))
-        ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
-        print(color("\nSaver saved: " + ckpt_path, fg='white', bg='blue', style='bold'))
+
         # if avg_reward > 40.0: # baseline
         #   print('baseline passed!')
         #   ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
