@@ -251,7 +251,7 @@ class Agent_DQN(Agent):
     train_rewards = []
     train_episode_len = 0.0
     file_loss = open("loss.csv", "a")
-    file_loss.write("episode,step,reward,loss,length\n")
+    file_loss.write("episode,step,epsilon,reward,loss,length\n")
     for episode in pbar:
       # print('episode: ', episode)
       # "state" is also known as "observation"
@@ -293,7 +293,7 @@ class Agent_DQN(Agent):
         avg_episode_len_train = train_episode_len / float(self.args.num_eval)
         train_episode_len = 0.0
         
-        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.2f}".format(avg_reward_train) + "," + "{:.4f}".format(current_loss) + "," + "{:.2f}".format(avg_episode_len_train) + "\n")
+        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.4f}".format(self.epsilon) + "," + "{:.2f}".format(avg_reward_train) + "," + "{:.4f}".format(current_loss) + "," + "{:.2f}".format(avg_episode_len_train) + "\n")
         file_loss.flush()
         
         print(color("\n[Train] Avg Reward: " + "{:.2f}".format(avg_reward_train) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len_train), fg='red', bg='white'))
