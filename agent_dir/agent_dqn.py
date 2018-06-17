@@ -38,9 +38,6 @@ class Agent_DQN(Agent):
     self.step = 0
     self.stage = ""
 
-    if args.test_dqn:
-      #you can load your model here
-      print('loading trained model')
 
     self.s = tf.placeholder(tf.float32, [None, 84, 84, 4], 
       name='s')
@@ -68,7 +65,18 @@ class Agent_DQN(Agent):
     
     self.summary_writer = tf.summary.FileWriter(self.args.log_dir, graph=self.sess.graph)
 
-    self.init()
+    if args.test_dqn:
+      #you can load your model here
+      print('loading trained model')
+      ckpt = tf.train.get_checkpoint_state(self.args.save_dir)
+      print(ckpt)
+      if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+        print('Reloading model parameters..')
+        self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+        print(ckpt.model_checkpoint_path)
+        self.step = self.sess.run(self.global_step)
+    else:
+      self.init()
 
   def init(self):
     ckpt = tf.train.get_checkpoint_state(self.args.save_dir)
@@ -76,7 +84,6 @@ class Agent_DQN(Agent):
     if self.args.load_saver and ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
         print('Reloading model parameters..')
         self.saver.restore(self.sess, ckpt.model_checkpoint_path)
-        #model_eval.saver.restore(eval_sess, ckpt.model_checkpoint_path)
         print(ckpt.model_checkpoint_path)
         self.step = self.sess.run(self.global_step)
         print('load step: ', self.step)
@@ -93,7 +100,7 @@ class Agent_DQN(Agent):
 
   def build_net(self, s, var_scope):
 
-    with tf.variable_scope(var_scope):      
+    with tf.variable_scope(var_scope):
       with tf.variable_scope('conv1'):
         W1 = self.init_W(shape=[8, 8, 4, 32])
         b1 = self.init_b(shape=[32])
@@ -287,13 +294,12 @@ class Agent_DQN(Agent):
       train_episode_len += s
 
       if episode % self.args.num_eval == 0 and episode != 0:
-        current_loss = train_loss
         avg_reward_train = np.mean(train_rewards)
         train_rewards = []
         avg_episode_len_train = train_episode_len / float(self.args.num_eval)
         train_episode_len = 0.0
         
-        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.4f}".format(self.epsilon) + "," + "{:.2f}".format(avg_reward_train) + "," + "{:.4f}".format(current_loss) + "," + "{:.2f}".format(avg_episode_len_train) + "\n")
+        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.4f}".format(self.epsilon) + "," + "{:.2f}".format(avg_reward_train) + "," + "{:.4f}".format(train_loss) + "," + "{:.2f}".format(avg_episode_len_train) + "\n")
         file_loss.flush()
         
         print(color("\n[Train] Avg Reward: " + "{:.2f}".format(avg_reward_train) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len_train), fg='red', bg='white'))
@@ -315,6 +321,12 @@ class Agent_DQN(Agent):
             """
     state = observation.reshape((1, 84, 84, 4))
     q_value = self.sess.run(self.q_eval, feed_dict={self.s: state})[0]
+    
+    if test:
+      if random.random() <= 0.1:
+        return random.randrange(self.n_actions)
+      return np.argmax(q_value)
+
     if random.random() <= self.epsilon:
       action = random.randrange(self.n_actions)
     else:
