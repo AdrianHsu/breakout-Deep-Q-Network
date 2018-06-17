@@ -13,8 +13,8 @@ np.random.seed(0)
 tf.set_random_seed(0)
 
 config = tf.ConfigProto()
-# config.gpu_options.allow_growth = True
-config.gpu_options.per_process_gpu_memory_fraction = 0.2
+config.gpu_options.allow_growth = True
+# config.gpu_options.per_process_gpu_memory_fraction = 0.2
 # config.intra_op_parallelism_threads = 44 # cpu
 # config.inter_op_parallelism_threads = 44 # cpu
 print(config)
@@ -162,11 +162,17 @@ class Agent_DQN(Agent):
 
   def buildOptimizer(self):
     with tf.variable_scope('loss'):
+      # (32, 4) -> (32, 1)
+      self.train_summary.append(tf.summary.scalar('avg_q', 
+        tf.reduce_mean(self.q_eval)))
+
       self.q_action = tf.reduce_sum(tf.multiply(self.q_eval, self.action_input), reduction_indices=1)
-      self.train_summary.append(tf.summary.scalar('Q', 
-        tf.reduce_sum(self.q_action)))
+      self.train_summary.append(tf.summary.scalar('avg_action_q', 
+        tf.reduce_mean(self.q_action)))  
+
       self.loss = tf.reduce_mean(tf.square(self.y_input - self.q_action))
       self.train_summary.append(tf.summary.scalar('loss', self.loss))
+
       self.train_summary = tf.summary.merge(self.train_summary)
     with tf.variable_scope('train'):
       self.logits = tf.train.RMSPropOptimizer(self.lr).minimize(self.loss)
@@ -253,11 +259,13 @@ class Agent_DQN(Agent):
       # "state" is also known as "observation"
       obs = self.env.reset() #(84, 84, 4)
       total_loss = 0
-
+      train_total_reward = 0.0
+      train_episode_len = 0.0
       for s in range(self.args.max_num_steps):
         # self.env.env.render()
         action = self.make_action(obs, test=False) # Performing the same action for 4 frames?
         obs_, reward, done, info = self.env.step(action)
+        train_total_reward += reward
         self.storeTransition(obs, action, reward, obs_, done)
         self.step = self.sess.run(self.add_global)
         if len(self.replay_memory) > self.args.replay_memory_size:
@@ -271,32 +279,43 @@ class Agent_DQN(Agent):
         obs = obs_
         if done:
           break
+      train_episode_len += s
 
       if episode % self.args.num_eval == 0 and episode != 0:
         current_loss = total_loss
         current_step = self.step
-        total_eval_reward = 0
+        total_episode_len = 0
+        rewards = []
         for i in range(self.args.num_test_episodes):
           obs = self.env.reset()
+          self.init_game_setting()
+          episode_reward = 0.0
+          done = False
           # self.env.env.render()
+          episode_len = 0
           for j in range(self.args.max_num_steps):
             action = self.make_action(obs, test=True)
             obs_, reward, done, info = self.env.step(action)
-            total_eval_reward += reward
+            episode_reward += reward
+            episode_len += 1
             if done:
               break
-        avg_reward = total_eval_reward / float(self.args.num_test_episodes)
+          rewards.append(episode_reward)
+          total_episode_len += j
+
+        avg_reward = np.mean(rewards)
+        avg_episode_len = total_episode_len / float(self.args.num_test_episodes)
         file_loss.write(str(episode) + "," + str(current_step) + "," + "{:.2f}".format(avg_reward) + "," + "{:.4f}".format(current_loss) + "\n")
         file_loss.flush()
 
-        print(color("\nAvg Reward(100 eps): " + "{:.2f}".format(avg_reward), fg='white', bg='orange'))
+        print(color("\nAvg Reward(100 eps): " + "{:.2f}".format(avg_reward) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len), fg='white', bg='orange'))
         # if avg_reward > 40.0: # baseline
         #   print('baseline passed!')
         #   ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
         #   print(color("\n Saver saved: " + ckpt_path, fg='white', bg='green', style='bold'))
         #   break
 
-      pbar.set_description(self.stage + " Gamma: " + "{:.2f}".format(self.gamma) + ', Epsilon: ' + "{:.4f}".format(self.epsilon) + ", len(deque): " + str(len(self.replay_memory)) + ", Step: " + str(current_step) + ", Loss: " + "{:.4f}".format(current_loss))
+      pbar.set_description(self.stage + " Gam: " + "{:.2f}".format(self.gamma) + ', Eps: ' + "{:.4f}".format(self.epsilon) + ", Rew: " + str(train_total_reward) + ", Len: " + str(train_episode_len) + ", Step: " + str(current_step) + ", L: " + "{:.4f}".format(current_loss))
 
     print('game over')
     # env.destroy()
