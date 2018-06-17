@@ -2,15 +2,16 @@ from agent_dir.agent import Agent
 from colors import *
 from tqdm import *
 from collections import deque
-
+import time
 import tensorflow as tf
 import numpy as np
 import os
 import random
 
-random.seed(0)
-np.random.seed(0)
-tf.set_random_seed(0)
+SEED = 11037
+random.seed(SEED)
+np.random.seed(SEED)
+tf.set_random_seed(SEED)
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -175,7 +176,7 @@ class Agent_DQN(Agent):
 
       self.train_summary = tf.summary.merge(self.train_summary)
     with tf.variable_scope('train'):
-      self.logits = tf.train.RMSPropOptimizer(self.lr).minimize(self.loss)
+      self.logits = tf.train.RMSPropOptimizer(self.lr, decay=0.99, momentum=0.9, epsilon=1e-6).minimize(self.loss)
 
   def storeTransition(self, s, action, reward, s_, done):
     """
@@ -251,11 +252,12 @@ class Agent_DQN(Agent):
     train_rewards = []
     train_episode_len = 0.0
     file_loss = open("loss.csv", "a")
-    file_loss.write("episode,step,reward,loss\n")
+    file_loss.write("episode,step,reward,loss,time\n")
     for episode in pbar:
       # print('episode: ', episode)
       # "state" is also known as "observation"
       obs = self.env.reset() #(84, 84, 4)
+      self.init_game_setting()
       train_loss = 0
       
       episode_reward = 0.0
@@ -287,36 +289,19 @@ class Agent_DQN(Agent):
 
       if episode % self.args.num_eval == 0 and episode != 0:
         current_loss = train_loss
-        test_episode_len = 0
-        test_rewards = []
-        for i in range(self.args.num_test_episodes):
-          obs = self.env.reset()
-          self.init_game_setting()
-          episode_reward = 0.0
-          done = False
-          # self.env.env.render()
-          episode_len = 0
-          for j in range(self.args.max_num_steps):
-            action = self.make_action(obs, test=True)
-            obs_, reward, done, info = self.env.step(action)
-            episode_reward += reward
-            episode_len += 1
-            if done:
-              break
-          test_rewards.append(episode_reward)
-          test_episode_len += j
-
         avg_reward_train = np.mean(train_rewards)
         train_rewards = []
         avg_episode_len_train = train_episode_len / float(self.args.num_eval)
         train_episode_len = 0.0
-
+        tBegin = time.time()
+        test_rewards, test_episode_len = self.test(self.args.num_test_episodes) 
+        total_time = time.time() - tBegin
         avg_reward = np.mean(test_rewards)
         avg_episode_len = test_episode_len / float(self.args.num_test_episodes)
-        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.2f}".format(avg_reward) + "," + "{:.4f}".format(current_loss) + "\n")
+        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.2f}".format(avg_reward) + "," + "{:.4f}".format(current_loss) + "," + "{:.2f}".format(total_time) + "\n")
         file_loss.flush()
-        print(color("\n[Train] Avg Reward(300 eps): " + "{:.2f}".format(avg_reward_train) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len_train), fg='red', bg='white'))
-        print(color("\n[Test]  Avg Reward(100 eps): " + "{:.2f}".format(avg_reward) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len), fg='white', bg='orange'))
+        print(color("\n[Train] Avg Reward(200 eps): " + "{:.2f}".format(avg_reward_train) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len_train), fg='red', bg='white'))
+        print(color("\n[Test]  Avg Reward(100 eps): " + "{:.2f}".format(avg_reward) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len) + ", Time(sec): " + "{:.2f}".format(total_time), fg='white', bg='orange'))
 
         # if avg_reward > 40.0: # baseline
         #   print('baseline passed!')
@@ -324,7 +309,7 @@ class Agent_DQN(Agent):
         #   print(color("\n Saver saved: " + ckpt_path, fg='white', bg='green', style='bold'))
         #   break
 
-      pbar.set_description(self.stage + " Gamma: " + "{:.2f}".format(self.gamma) + ', Epsilon: ' + "{:.4f}".format(self.epsilon) + ", Loss: " + "{:.4f}".format(current_loss) + ", Step: " + str(self.step))
+      pbar.set_description(self.stage + " G: " + "{:.2f}".format(self.gamma) + ', E: ' + "{:.2f}".format(self.epsilon) + ", L: " + "{:.4f}".format(current_loss) + ", D: " + str(len(self.replay_memory)) + ", S: " + str(self.step))
 
     print('game over')
     # env.destroy()
@@ -341,12 +326,6 @@ class Agent_DQN(Agent):
             """
     state = observation.reshape((1, 84, 84, 4))
     q_value = self.sess.run(self.q_eval, feed_dict={self.s: state})[0]
-    if test:
-      if random.random() <= 0.01:
-        return random.randrange(self.n_actions)
-      else:
-        return np.argmax(q_value)
-
     if random.random() <= self.epsilon:
       action = random.randrange(self.n_actions)
     else:
@@ -364,3 +343,24 @@ class Agent_DQN(Agent):
     # return self.env.get_random_action()
 
 
+  def test(self, total_episodes):
+    rewards = []
+    test_episode_len = 0
+    for i in range(total_episodes):
+      state = self.env.reset()
+      self.init_game_setting()
+      done = False
+      episode_reward = 0.0
+
+      #playing one game
+      while(not done):
+      # env.env.render()
+        action = self.make_action(state, test=True)
+        state, reward, done, info = self.env.step(action)
+        episode_reward += reward
+        test_episode_len += 1
+      rewards.append(episode_reward)
+      #print(episode_reward)
+    #print('Run %d episodes'%(total_episodes))
+    #print('Mean:', np.mean(rewards))
+    return rewards, test_episode_len
