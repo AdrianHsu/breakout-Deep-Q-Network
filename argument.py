@@ -8,7 +8,7 @@ def add_arguments(parser):
         parser.add_argument('--learning_rate', type=float, default=0.01, help='learning rate for training')
     '''
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--replay_memory_size', type=int, default=100000)
+    parser.add_argument('--replay_memory_size', type=int, default=10000)
     parser.add_argument('--update_target', type=int, default=1000)
     parser.add_argument('--update_eval', type=int, default=4)
     parser.add_argument('--print_time', type=int, default=2500)
