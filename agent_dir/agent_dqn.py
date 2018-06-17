@@ -2,7 +2,6 @@ from agent_dir.agent import Agent
 from colors import *
 from tqdm import *
 from collections import deque
-import time
 import tensorflow as tf
 import numpy as np
 import os
@@ -252,7 +251,7 @@ class Agent_DQN(Agent):
     train_rewards = []
     train_episode_len = 0.0
     file_loss = open("loss.csv", "a")
-    file_loss.write("episode,step,reward,loss,time\n")
+    file_loss.write("episode,step,reward,loss,length\n")
     for episode in pbar:
       # print('episode: ', episode)
       # "state" is also known as "observation"
@@ -293,21 +292,11 @@ class Agent_DQN(Agent):
         train_rewards = []
         avg_episode_len_train = train_episode_len / float(self.args.num_eval)
         train_episode_len = 0.0
-        tBegin = time.time()
-        test_rewards, test_episode_len = self.test(self.args.num_test_episodes) 
-        total_time = time.time() - tBegin
-        avg_reward = np.mean(test_rewards)
-        avg_episode_len = test_episode_len / float(self.args.num_test_episodes)
-        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.2f}".format(avg_reward) + "," + "{:.4f}".format(current_loss) + "," + "{:.2f}".format(total_time) + "\n")
+        
+        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.2f}".format(avg_reward_train) + "," + "{:.4f}".format(current_loss) + "," + "{:.2f}".format(avg_episode_len_train) + "\n")
         file_loss.flush()
-        print(color("\n[Train] Avg Reward(200 eps): " + "{:.2f}".format(avg_reward_train) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len_train), fg='red', bg='white'))
-        print(color("\n[Test]  Avg Reward(100 eps): " + "{:.2f}".format(avg_reward) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len) + ", Time(sec): " + "{:.2f}".format(total_time), fg='white', bg='orange'))
-
-        # if avg_reward > 40.0: # baseline
-        #   print('baseline passed!')
-        #   ckpt_path = self.saver.save(self.sess, self.ckpts_path, global_step = self.global_step)
-        #   print(color("\n Saver saved: " + ckpt_path, fg='white', bg='green', style='bold'))
-        #   break
+        
+        print(color("\n[Train] Avg Reward: " + "{:.2f}".format(avg_reward_train) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len_train), fg='red', bg='white'))
 
       pbar.set_description(self.stage + " G: " + "{:.2f}".format(self.gamma) + ', E: ' + "{:.2f}".format(self.epsilon) + ", L: " + "{:.4f}".format(current_loss) + ", D: " + str(len(self.replay_memory)) + ", S: " + str(self.step))
 
@@ -342,25 +331,3 @@ class Agent_DQN(Agent):
 
     # return self.env.get_random_action()
 
-
-  def test(self, total_episodes):
-    rewards = []
-    test_episode_len = 0
-    for i in range(total_episodes):
-      state = self.env.reset()
-      self.init_game_setting()
-      done = False
-      episode_reward = 0.0
-
-      #playing one game
-      while(not done):
-      # env.env.render()
-        action = self.make_action(state, test=True)
-        state, reward, done, info = self.env.step(action)
-        episode_reward += reward
-        test_episode_len += 1
-      rewards.append(episode_reward)
-      #print(episode_reward)
-    #print('Run %d episodes'%(total_episodes))
-    #print('Mean:', np.mean(rewards))
-    return rewards, test_episode_len
