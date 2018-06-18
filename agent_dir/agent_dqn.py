@@ -135,23 +135,25 @@ class Agent_DQN(Agent):
         W_fc1 = self.init_W(shape=[3136, 512])
         b_fc1 = self.init_b(shape=[512])
         fc1 = tf.nn.bias_add(tf.matmul(h_flatten, W_fc1), b_fc1)
-        h_fc1 = tf.nn.relu(fc1)
 
       if not self.dueling:
         with tf.variable_scope('fc2'):
+          h_fc1 = tf.nn.relu(fc1)
           W_fc2 = self.init_W(shape=[512, 4])
           b_fc2 = self.init_b(shape=[4])
           out = tf.nn.bias_add(tf.matmul(h_fc1, W_fc2), b_fc2, name='Q')
       else:
         with tf.variable_scope('Value'):
-          W_fc2 = self.init_W(shape=[512, 1])
-          b_fc2 = self.init_b(shape=[1])
-          self.V = tf.nn.bias_add(tf.matmul(h_fc1, W_fc2), b_fc2, name='V')
+          h_fc1_v = tf.nn.relu(fc1)
+          W_v = self.init_W(shape=[512, 1])
+          b_v = self.init_b(shape=[1])
+          self.V = tf.nn.bias_add(tf.matmul(h_fc1_v, W_v), b_v, name='V')
 
         with tf.variable_scope('Advantage'):
-          W_fc2 = self.init_W(shape=[512, 4])
-          b_fc2 = self.init_b(shape=[4])
-          self.A = tf.nn.bias_add(tf.matmul(h_fc1, W_fc2), b_fc2, name='A')
+          h_fc1_a = tf.nn.relu(fc1)
+          W_a = self.init_W(shape=[512, 4])
+          b_a = self.init_b(shape=[4])
+          self.A = tf.nn.bias_add(tf.matmul(h_fc1_a, W_a), b_a, name='A')
         
         with tf.variable_scope('Q'):
           out = self.V + (self.A - tf.reduce_mean(self.A, axis=1, keep_dims=True))
@@ -229,13 +231,13 @@ class Agent_DQN(Agent):
     elif self.step == self.args.observe_steps + self.args.explore_steps:
       self.stage = stages[2]
 
-    self.replay_memory.append((s, one_hot_action, reward, s_, done))
+    self.replay_memory.append((s, one_hot_action, int(reward), s_, done))
 
   def learn(self):
     minibatch = random.sample(self.replay_memory, self.batch_size)
     state_batch = [data[0] for data in minibatch]
     action_batch = [data[1] for data in minibatch]
-    reward_batch = [data[2] for data in minibatch]
+    reward_batch = [float(data[2]) for data in minibatch]
     next_state_batch = [data[3] for data in minibatch]
     done_batch = [data[4] for data in minibatch]
     # print(np.array(state_batch).shape) # (32, 84, 84, 4)
@@ -370,7 +372,7 @@ class Agent_DQN(Agent):
 
     if self.epsilon > self.args.epsilon_end \
         and self.step > self.args.observe_steps:
-      old_e = self.epsilon
+            old_e = self.epsilon
       interval = self.args.epsilon_start - self.args.epsilon_end
       self.epsilon -= interval / float(self.args.explore_steps)
       # print('epsilon: ', old_e, ' -> ', self.epsilon)
