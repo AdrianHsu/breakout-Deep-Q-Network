@@ -241,7 +241,7 @@ class Agent_DQN(Agent):
             stack 4 last preprocessed frames, shape: (84, 84, 4)
         action: int (0, 1, 2, 3)
             the predicted action from trained model
-        reward: float (0, +1, -1)
+        reward: float64 (0, +1, -1)
             the reward from selected action
     Return:
         None
@@ -255,7 +255,7 @@ class Agent_DQN(Agent):
       self.stage = stages[2]
 
     self.step = self.sess.run(self.add_global)
-    self.memory.push(s, action, reward, s_, done)
+    self.memory.push(s, action, int(reward), s_, done)
 
   def learn(self):
     transitions = self.memory.sample(self.batch_size)
@@ -268,6 +268,7 @@ class Agent_DQN(Agent):
       one_hot_action[act] = 1
       action_batch.append(one_hot_action)
     reward_batch = list(minibatch.reward)
+    reward_batch = [float(data) for data in reward_batch]
     next_state_batch = list(minibatch.next_state)
     done_batch = list(minibatch.done)
 
