@@ -27,6 +27,7 @@ def add_arguments(parser):
     parser.add_argument('--epsilon_start', type=float, default=1.0)
     parser.add_argument('--epsilon_end', type=float, default=0.1)
     parser.add_argument('--output_logs', type=str, default='loss.csv')
-    parser.add_argument('--dueling', type=int, default=0)
+    parser.add_argument('--dueling_dqn', type=int, default=0)
+    parser.add_argument('--double_dqn', type=int, default=0)
 
     return parser

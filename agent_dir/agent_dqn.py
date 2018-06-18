@@ -30,7 +30,8 @@ class Agent_DQN(Agent):
     self.args = args
     self.batch_size = args.batch_size
     self.lr = args.learning_rate
-    self.dueling = args.dueling
+    self.dueling = args.dueling_dqn
+    self.double = args.double_dqn
     self.gamma = args.gamma_reward_decay
     self.n_actions = env.action_space.n # = 4
     self.state_dim = env.observation_space.shape[0] # 84
@@ -136,16 +137,12 @@ class Agent_DQN(Agent):
         fc1 = tf.nn.bias_add(tf.matmul(h_flatten, W_fc1), b_fc1)
         h_fc1 = tf.nn.relu(fc1)
 
-
-
       if not self.dueling:
-        print('[Natural DQN]')
         with tf.variable_scope('fc2'):
           W_fc2 = self.init_W(shape=[512, 4])
           b_fc2 = self.init_b(shape=[4])
           out = tf.nn.bias_add(tf.matmul(h_fc1, W_fc2), b_fc2, name='Q')
       else:
-        print('[Dueling DQN]')
         with tf.variable_scope('Value'):
           W_fc2 = self.init_W(shape=[512, 1])
           b_fc2 = self.init_b(shape=[1])
@@ -243,18 +240,33 @@ class Agent_DQN(Agent):
     done_batch = [data[4] for data in minibatch]
     # print(np.array(state_batch).shape) # (32, 84, 84, 4)
 
-    q_eval_batch = self.sess.run(self.q_target, 
-      feed_dict={self.s_: next_state_batch})
 
     y_batch = []
+    if not self.double: # not doubleDQN
+      q_batch = self.sess.run(self.q_target, 
+        feed_dict={self.s_: next_state_batch})
+      for i in range(self.batch_size):
+        done = done_batch[i]
+        if done:
+          y_batch.append(reward_batch[i])
+        else:
+          y = reward_batch[i] + self.gamma * np.max(q_batch[i])
+          y_batch.append(y)
+    else:
+      q_batch_now = self.sess.run(self.q_eval,
+        feed_dict={self.s: next_state_batch})
+      q_batch = self.sess.run(self.q_target, 
+        feed_dict={self.s_: next_state_batch})
+      for i in range(self.batch_size):
+        done = done_batch[i]
+        if done:
+          y_batch.append(reward_batch[i])
+        else:
+          double_q = q_batch[i][np.argmax(q_batch_now[i])]
+          y = reward_batch[i] + self.gamma * double_q
+          y_batch.append(y)
 
-    for i in range(self.batch_size):
-      done = done_batch[i]
-      if done:
-        y_batch.append(reward_batch[i])
-      else:
-        y = reward_batch[i] + self.gamma * np.max(q_eval_batch[i])
-        y_batch.append(y)
+      
 
     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
     _, summary, loss = self.sess.run([self.logits, self.train_summary, self.loss], feed_dict={
