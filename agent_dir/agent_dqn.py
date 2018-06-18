@@ -229,13 +229,13 @@ class Agent_DQN(Agent):
     elif self.step == self.args.observe_steps + self.args.explore_steps:
       self.stage = stages[2]
 
-    self.replay_memory.append((s, one_hot_action, reward, s_, done))
+    self.replay_memory.append((s, one_hot_action, int(reward), s_, done))
 
   def learn(self):
     minibatch = random.sample(self.replay_memory, self.batch_size)
     state_batch = [data[0] for data in minibatch]
     action_batch = [data[1] for data in minibatch]
-    reward_batch = [data[2] for data in minibatch]
+    reward_batch = [float(data[2]) for data in minibatch]
     next_state_batch = [data[3] for data in minibatch]
     done_batch = [data[4] for data in minibatch]
     # print(np.array(state_batch).shape) # (32, 84, 84, 4)
