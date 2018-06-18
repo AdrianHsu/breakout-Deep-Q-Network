@@ -1,7 +1,8 @@
 from agent_dir.agent import Agent
 from colors import *
 from tqdm import *
-from collections import deque
+from collections import namedtuple
+
 import tensorflow as tf
 import numpy as np
 import os
@@ -19,6 +20,9 @@ config.gpu_options.allow_growth = True
 # config.inter_op_parallelism_threads = 44 # cpu
 print(config)
 stages = ["[OBSERVE]", "[EXPLORE]", "[TRAIN]"]
+
+Transition = namedtuple('Transition',
+                        ('state', 'action', 'reward', 'next_state', 'done'))
 
 class Agent_DQN(Agent):
   def __init__(self, env, args):
@@ -40,7 +44,7 @@ class Agent_DQN(Agent):
     self.add_global = self.global_step.assign_add(1)
     self.step = 0
     self.stage = ""
-
+    self.memory = self.ReplayMemory(self.args.replay_memory_size)
 
     self.s = tf.placeholder(tf.float32, [None, 84, 84, 4], 
       name='s')
@@ -60,7 +64,6 @@ class Agent_DQN(Agent):
     self.replace_target_op = [tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)] 
 
     self.epsilon = self.args.epsilon_start
-    self.replay_memory = deque()
 
     self.ckpts_path = self.args.save_dir + "dqn.ckpt"
     self.saver = tf.train.Saver(max_to_keep = 3)
@@ -104,6 +107,27 @@ class Agent_DQN(Agent):
     Put anything you want to initialize if necessary
     """
     pass
+  
+  
+  class ReplayMemory(object):
+    # https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
+    def __init__(self, capacity):
+      self.capacity = capacity
+      self.memory = []
+      self.position = 0
+
+    def push(self, *args):
+      """Saves a transition."""
+      if len(self.memory) < self.capacity:
+          self.memory.append(None)
+      self.memory[self.position] = Transition(*args)
+      self.position = (self.position + 1) % self.capacity
+
+    def sample(self, batch_size):
+      return random.sample(self.memory, batch_size)
+
+    def __len__(self):
+      return len(self.memory)
 
   def build_net(self, s, var_scope):
 
@@ -222,8 +246,7 @@ class Agent_DQN(Agent):
     Return:
         None
     """
-    one_hot_action = np.zeros(self.n_actions)
-    one_hot_action[action] = 1
+    
     if self.step == 0:
       self.stage = stages[0]
     elif self.step == self.args.observe_steps:
@@ -231,17 +254,22 @@ class Agent_DQN(Agent):
     elif self.step == self.args.observe_steps + self.args.explore_steps:
       self.stage = stages[2]
 
-    self.replay_memory.append((s, one_hot_action, int(reward), s_, done))
+    self.step = self.sess.run(self.add_global)
+    self.memory.push(s, action, reward, s_, done)
 
   def learn(self):
-    minibatch = random.sample(self.replay_memory, self.batch_size)
-    state_batch = [data[0] for data in minibatch]
-    action_batch = [data[1] for data in minibatch]
-    reward_batch = [float(data[2]) for data in minibatch]
-    next_state_batch = [data[3] for data in minibatch]
-    done_batch = [data[4] for data in minibatch]
-    # print(np.array(state_batch).shape) # (32, 84, 84, 4)
+    transitions = self.memory.sample(self.batch_size)
+    minibatch = Transition(*zip(*transitions))
 
+    state_batch = list(minibatch.state)
+    action_batch = []
+    for act in list(minibatch.action):
+      one_hot_action = np.zeros(self.n_actions)
+      one_hot_action[act] = 1
+      action_batch.append(one_hot_action)
+    reward_batch = list(minibatch.reward)
+    next_state_batch = list(minibatch.next_state)
+    done_batch = list(minibatch.done)
 
     y_batch = []
     if not self.double: # not doubleDQN
@@ -266,9 +294,7 @@ class Agent_DQN(Agent):
         else:
           double_q = q_batch[i][np.argmax(q_batch_now[i])]
           y = reward_batch[i] + self.gamma * double_q
-          y_batch.append(y)
-
-      
+          y_batch.append(y)      
 
     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
     _, summary, loss = self.sess.run([self.logits, self.train_summary, self.loss], feed_dict={
@@ -311,12 +337,13 @@ class Agent_DQN(Agent):
         obs_, reward, done, info = self.env.step(action)
         episode_reward += reward
         self.storeTransition(obs, action, reward, obs_, done)
-        self.step = self.sess.run(self.add_global)
         
-        if len(self.replay_memory) > self.args.replay_memory_size:
-          self.replay_memory.popleft()
+        # if len(self.memory) > self.args.replay_memory_size:
+        # NOT REQUIRED TO POPLEFT(), IT WILL BE REPLACED 
+        # self.replay_memory.popleft()
+
         # once the storage stored > batch_size, start training
-        if len(self.replay_memory) > self.batch_size:
+        if len(self.memory) > self.batch_size:
           if self.step % self.args.update_eval == 0:
             loss = self.learn()
             train_loss += loss
@@ -342,7 +369,7 @@ class Agent_DQN(Agent):
         
         print(color("\n[Train] Avg Reward: " + "{:.2f}".format(avg_reward_train) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len_train), fg='red', bg='white'))
 
-      pbar.set_description(self.stage + " G: " + "{:.2f}".format(self.gamma) + ', E: ' + "{:.2f}".format(self.epsilon) + ", L: " + "{:.4f}".format(current_loss) + ", D: " + str(len(self.replay_memory)) + ", S: " + str(self.step))
+      pbar.set_description(self.stage + " G: " + "{:.2f}".format(self.gamma) + ', E: ' + "{:.2f}".format(self.epsilon) + ", L: " + "{:.4f}".format(current_loss) + ", D: " + str(len(self.memory)) + ", S: " + str(self.step))
 
     print('game over')
     # env.destroy()
@@ -372,7 +399,7 @@ class Agent_DQN(Agent):
 
     if self.epsilon > self.args.epsilon_end \
         and self.step > self.args.observe_steps:
-            old_e = self.epsilon
+      old_e = self.epsilon
       interval = self.args.epsilon_start - self.args.epsilon_end
       self.epsilon -= interval / float(self.args.explore_steps)
       # print('epsilon: ', old_e, ' -> ', self.epsilon)
