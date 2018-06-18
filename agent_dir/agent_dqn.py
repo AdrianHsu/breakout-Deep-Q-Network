@@ -5,7 +5,7 @@ from collections import namedtuple
 
 import tensorflow as tf
 import numpy as np
-import os
+import os, sys
 import random
 
 SEED = 11037
@@ -255,8 +255,14 @@ class Agent_DQN(Agent):
       self.stage = stages[2]
 
     self.step = self.sess.run(self.add_global)
-    self.memory.push(s, action, int(reward), s_, done)
-
+   # print(sys.getsizeof(s)) # 113024
+   # print(sys.getsizeof(action)) # 28 or 24
+   # print(sys.getsizeof(int(reward))) # 24
+   # print(sys.getsizeof(s_)) # 113024
+   # print(sys.getsizeof(done)) # 24
+   # 113024 + 24 + 24 + 113024 + 24 = 226120 bytes
+    self.memory.push(s, int(action), int(reward), s_, done)
+  
   def learn(self):
     transitions = self.memory.sample(self.batch_size)
     minibatch = Transition(*zip(*transitions))
