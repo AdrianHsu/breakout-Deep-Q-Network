@@ -255,19 +255,24 @@ class Agent_DQN(Agent):
       self.stage = stages[2]
 
     self.step = self.sess.run(self.add_global)
-   # print(sys.getsizeof(s)) # 113024
-   # print(sys.getsizeof(action)) # 28 or 24
-   # print(sys.getsizeof(int(reward))) # 24
-   # print(sys.getsizeof(s_)) # 113024
-   # print(sys.getsizeof(done)) # 24
-   # 113024 + 24 + 24 + 113024 + 24 = 226120 bytes
+    
+    #np.set_printoptions(threshold=np.nan)
+    assert np.amin(s) >= 0.0
+    assert np.amax(s) <= 1.0
+    
+    s  = (s * 255).round().astype(np.uint8)
+    s_ = (s_ * 255).round().astype(np.uint8)
+    #print(sys.getsizeof(image)) # 28352, uint8
+    #print(sys.getsizeof(s)) # 113024, float32
+    
     self.memory.push(s, int(action), int(reward), s_, done)
   
   def learn(self):
     transitions = self.memory.sample(self.batch_size)
     minibatch = Transition(*zip(*transitions))
 
-    state_batch = list(minibatch.state)
+    state_batch = [(s).astype(np.float32) / 255.0 for s in list(minibatch.state)]
+    next_state_batch = [(s_).astype(np.float32) / 255.0 for s_ in list(minibatch.next_state)]
     action_batch = []
     for act in list(minibatch.action):
       one_hot_action = np.zeros(self.n_actions)
@@ -275,7 +280,6 @@ class Agent_DQN(Agent):
       action_batch.append(one_hot_action)
     reward_batch = list(minibatch.reward)
     reward_batch = [float(data) for data in reward_batch]
-    next_state_batch = list(minibatch.next_state)
     done_batch = list(minibatch.done)
 
     y_batch = []
