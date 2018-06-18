@@ -30,9 +30,11 @@ class Agent_DQN(Agent):
     self.args = args
     self.batch_size = args.batch_size
     self.lr = args.learning_rate
+    self.dueling = args.dueling
     self.gamma = args.gamma_reward_decay
     self.n_actions = env.action_space.n # = 4
     self.state_dim = env.observation_space.shape[0] # 84
+    self.output_logs = args.output_logs # 'loss.csv'
     self.global_step = tf.Variable(0, trainable=False)
     self.add_global = self.global_step.assign_add(1)
     self.step = 0
@@ -75,10 +77,14 @@ class Agent_DQN(Agent):
         self.saver.restore(self.sess, ckpt.model_checkpoint_path)
         print(ckpt.model_checkpoint_path)
         self.step = self.sess.run(self.global_step)
+        print('load step: ', self.step)
+      else:
+        print('load model failed! exit...')
+        exit(0)
     else:
-      self.init()
+      self.init_model()
 
-  def init(self):
+  def init_model(self):
     ckpt = tf.train.get_checkpoint_state(self.args.save_dir)
     print(ckpt)
     if self.args.load_saver and ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
@@ -130,12 +136,30 @@ class Agent_DQN(Agent):
         fc1 = tf.nn.bias_add(tf.matmul(h_flatten, W_fc1), b_fc1)
         h_fc1 = tf.nn.relu(fc1)
 
-      with tf.variable_scope('fc2'):
-        W_fc2 = self.init_W(shape=[512, 4])
-        b_fc2 = self.init_b(shape=[4])
-        fc2 = tf.nn.bias_add(tf.matmul(h_fc1, W_fc2), b_fc2, name='Q')
-    
-    return fc2
+
+
+      if not self.dueling:
+        print('[Natural DQN]')
+        with tf.variable_scope('fc2'):
+          W_fc2 = self.init_W(shape=[512, 4])
+          b_fc2 = self.init_b(shape=[4])
+          out = tf.nn.bias_add(tf.matmul(h_fc1, W_fc2), b_fc2, name='Q')
+      else:
+        print('[Dueling DQN]')
+        with tf.variable_scope('Value'):
+          W_fc2 = self.init_W(shape=[512, 1])
+          b_fc2 = self.init_b(shape=[1])
+          self.V = tf.nn.bias_add(tf.matmul(h_fc1, W_fc2), b_fc2, name='V')
+
+        with tf.variable_scope('Advantage'):
+          W_fc2 = self.init_W(shape=[512, 4])
+          b_fc2 = self.init_b(shape=[4])
+          self.A = tf.nn.bias_add(tf.matmul(h_fc1, W_fc2), b_fc2, name='A')
+        
+        with tf.variable_scope('Q'):
+          out = self.V + (self.A - tf.reduce_mean(self.A, axis=1, keep_dims=True))
+
+    return out
 
   def init_W(self, shape, name='weights', 
     w_initializer=tf.truncated_normal_initializer(0, 1e-2)):
@@ -257,7 +281,7 @@ class Agent_DQN(Agent):
     current_loss = 0
     train_rewards = []
     train_episode_len = 0.0
-    file_loss = open("loss.csv", "a")
+    file_loss = open(self.output_logs, "a")
     file_loss.write("episode,step,epsilon,reward,loss,length\n")
     for episode in pbar:
       # print('episode: ', episode)

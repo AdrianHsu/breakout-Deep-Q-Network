@@ -1,0 +1,1 @@
+python3 main.py --train_dqn --log_dir=logs_dueling/ --save_dir=save_dueling/ --output_logs=loss_dueling.csv --dueling=1
