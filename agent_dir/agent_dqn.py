@@ -229,7 +229,7 @@ class Agent_DQN(Agent):
 
       self.train_summary = tf.summary.merge(self.train_summary)
     with tf.variable_scope('train'):
-      self.logits = tf.train.RMSPropOptimizer(self.lr).minimize(self.loss)
+      self.logits = tf.train.RMSPropOptimizer(self.lr, momentum=0.95, epsilon=0.01).minimize(self.loss)
 
   def storeTransition(self, s, action, reward, s_, done):
     """
