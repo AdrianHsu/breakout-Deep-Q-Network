@@ -14,10 +14,10 @@ np.random.seed(SEED)
 tf.set_random_seed(SEED)
 
 config = tf.ConfigProto()
+# device_count = {'CPU': 16, 'GPU': 1}, log_device_placement=True)
 config.gpu_options.allow_growth = True
-# config.gpu_options.per_process_gpu_memory_fraction = 0.2
-# config.intra_op_parallelism_threads = 44 # cpu
-# config.inter_op_parallelism_threads = 44 # cpu
+#config.intra_op_parallelism_threads = 1 # cpu
+#config.inter_op_parallelism_threads = 1 # cpu
 print(config)
 stages = ["[OBSERVE]", "[EXPLORE]", "[TRAIN]"]
 
@@ -230,7 +230,7 @@ class Agent_DQN(Agent):
       self.train_summary = tf.summary.merge(self.train_summary)
     with tf.variable_scope('train'):
       #self.logits = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
-     # self.logits = self.build_rmsprop_optimizer(self.lr, 0.9, 1e-10, 1, 'graves_rmsprop')
+      #self.logits = self.build_rmsprop_optimizer(self.lr, 0.1, 1e-10, 1, 'graves_rmsprop')
       self.logits = self.build_rmsprop_optimizer(self.lr, 0.9, 1e-10, 1, 'rmsprop')
 
   # https://github.com/Jabberwockyll/deep_rl_ale
