@@ -14,8 +14,8 @@ np.random.seed(SEED)
 tf.set_random_seed(SEED)
 
 config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
-# config.gpu_options.per_process_gpu_memory_fraction = 0.2
+# config.gpu_options.allow_growth = True
+config.gpu_options.per_process_gpu_memory_fraction = 0.4
 # config.intra_op_parallelism_threads = 44 # cpu
 # config.inter_op_parallelism_threads = 44 # cpu
 print(config)
