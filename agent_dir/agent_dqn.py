@@ -14,10 +14,10 @@ np.random.seed(SEED)
 tf.set_random_seed(SEED)
 
 config = tf.ConfigProto()
-# device_count = {'CPU': 16, 'GPU': 1}, log_device_placement=True)
 config.gpu_options.allow_growth = True
-#config.intra_op_parallelism_threads = 1 # cpu
-#config.inter_op_parallelism_threads = 1 # cpu
+config.gpu_options.per_process_gpu_memory_fraction = 0.4
+# config.intra_op_parallelism_threads = 1 # cpu
+# config.inter_op_parallelism_threads = 1 # cpu
 print(config)
 stages = ["[OBSERVE]", "[EXPLORE]", "[TRAIN]"]
 
