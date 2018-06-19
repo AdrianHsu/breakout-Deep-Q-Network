@@ -229,7 +229,8 @@ class Agent_DQN(Agent):
 
       self.train_summary = tf.summary.merge(self.train_summary)
     with tf.variable_scope('train'):
-      self.logits = tf.train.RMSPropOptimizer(self.lr).minimize(self.loss)
+      #self.logits = tf.train.RMSPropOptimizer(self.lr).minimize(self.loss)
+      self.logits = tf.train.RMSPropOptimizer(self.lr, decay=0.99, epsilon=1e-6).minimize(self.loss)
 
   def storeTransition(self, s, action, reward, s_, done):
     """
@@ -305,7 +306,7 @@ class Agent_DQN(Agent):
         else:
           double_q = q_batch[i][np.argmax(q_batch_now[i])]
           y = reward_batch[i] + self.gamma * double_q
-          y_batch.append(y)      
+          y_batch.append(y)
 
     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
     _, summary, loss = self.sess.run([self.logits, self.train_summary, self.loss], feed_dict={
@@ -328,7 +329,7 @@ class Agent_DQN(Agent):
     """
     Implement your training algorithm here
     """
-    pbar = tqdm(range(self.args.num_episodes))
+    pbar = tqdm(range(self.args.episode_start, self.args.num_episodes))
     current_loss = 0
     train_rewards = []
     train_episode_len = 0.0
@@ -344,7 +345,7 @@ class Agent_DQN(Agent):
       episode_reward = 0.0
       for s in range(self.args.max_num_steps):
         # self.env.env.render()
-        action = self.make_action(obs, test=False) # Performing the same action for 4 frames?
+        action = self.make_action(obs, test=False)
         obs_, reward, done, info = self.env.step(action)
         episode_reward += reward
         self.storeTransition(obs, action, reward, obs_, done)
@@ -355,7 +356,7 @@ class Agent_DQN(Agent):
 
         # once the storage stored > batch_size, start training
         if len(self.memory) > self.batch_size:
-          if self.step % self.args.update_eval == 0:
+          if self.step % self.args.update_current == 0:
             loss = self.learn()
             train_loss += loss
 
@@ -370,12 +371,13 @@ class Agent_DQN(Agent):
       train_episode_len += s
 
       if episode % self.args.num_eval == 0 and episode != 0:
+        current_loss = train_loss
         avg_reward_train = np.mean(train_rewards)
         train_rewards = []
         avg_episode_len_train = train_episode_len / float(self.args.num_eval)
         train_episode_len = 0.0
         
-        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.4f}".format(self.epsilon) + "," + "{:.2f}".format(avg_reward_train) + "," + "{:.4f}".format(train_loss) + "," + "{:.2f}".format(avg_episode_len_train) + "\n")
+        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.4f}".format(self.epsilon) + "," + "{:.2f}".format(avg_reward_train) + "," + "{:.4f}".format(current_loss) + "," + "{:.2f}".format(avg_episode_len_train) + "\n")
         file_loss.flush()
         
         print(color("\n[Train] Avg Reward: " + "{:.2f}".format(avg_reward_train) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len_train), fg='red', bg='white'))

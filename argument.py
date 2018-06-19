@@ -8,9 +8,9 @@ def add_arguments(parser):
         parser.add_argument('--learning_rate', type=float, default=0.01, help='learning rate for training')
     '''
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--replay_memory_size', type=int, default=200000)
+    parser.add_argument('--replay_memory_size', type=int, default=10000)
     parser.add_argument('--update_target', type=int, default=10000)
-    parser.add_argument('--update_eval', type=int, default=4)
+    parser.add_argument('--update_current', type=int, default=4)
     parser.add_argument('--summary_time', type=int, default=2500)
     parser.add_argument('--load_saver', type=int, default=0)
     parser.add_argument('--save_dir', type=str, default='save/')
@@ -27,6 +27,7 @@ def add_arguments(parser):
     parser.add_argument('--epsilon_start', type=float, default=1.0)
     parser.add_argument('--epsilon_end', type=float, default=0.1)
     parser.add_argument('--output_logs', type=str, default='loss.csv')
+    parser.add_argument('--episode_start', type=int, default=0)
     parser.add_argument('--dueling_dqn', type=int, default=0)
     parser.add_argument('--double_dqn', type=int, default=0)
 
