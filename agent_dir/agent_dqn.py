@@ -229,8 +229,52 @@ class Agent_DQN(Agent):
 
       self.train_summary = tf.summary.merge(self.train_summary)
     with tf.variable_scope('train'):
-      self.logits = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
-      #self.logits = tf.train.RMSPropOptimizer(self.lr).minimize(self.loss)
+      #self.logits = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
+      self.logits = self.build_rmsprop_optimizer(self.lr, 0.95, 0.01, 1, 'graves_rmsprop')
+      # self.logits = self.build_rmsprop_optimizer(self.lr, 0.95, 0.01, 1, 'rmsprop')
+
+  # https://github.com/Jabberwockyll/deep_rl_ale
+  def build_rmsprop_optimizer(self, learning_rate, rmsprop_decay, rmsprop_constant, gradient_clip, version):
+
+    with tf.name_scope('rmsprop'):
+      optimizer = None
+      if version == 'rmsprop':
+        optimizer = tf.train.RMSPropOptimizer(learning_rate, decay=rmsprop_decay, momentum=0.0, epsilon=rmsprop_constant)
+      elif version == 'graves_rmsprop':
+        optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+
+      grads_and_vars = optimizer.compute_gradients(self.loss)
+      grads = [gv[0] for gv in grads_and_vars]
+      params = [gv[1] for gv in grads_and_vars]
+      # print(grads)
+      if gradient_clip > 0:
+        grads = tf.clip_by_global_norm(grads, gradient_clip)[0]
+
+      grads = [grad for grad in grads if grad != None]
+
+      if version == 'rmsprop':
+        return optimizer.apply_gradients(zip(grads, params))
+      elif version == 'graves_rmsprop':
+        square_grads = [tf.square(grad) for grad in grads if grad != None]
+
+        avg_grads = [tf.Variable(tf.zeros(var.get_shape())) for var in params]
+        avg_square_grads = [tf.Variable(tf.zeros(var.get_shape())) for var in params]
+
+        update_avg_grads = [grad_pair[0].assign((rmsprop_decay * grad_pair[0]) + ((1 - rmsprop_decay) * grad_pair[1])) 
+          for grad_pair in zip(avg_grads, grads)]
+
+        update_avg_square_grads = [grad_pair[0].assign((rmsprop_decay * grad_pair[0]) + ((1 - rmsprop_decay) * tf.square(grad_pair[1]))) 
+          for grad_pair in zip(avg_square_grads, grads)]
+        avg_grad_updates = update_avg_grads + update_avg_square_grads
+
+        rms = [tf.sqrt(avg_grad_pair[1] - tf.square(avg_grad_pair[0]) + rmsprop_constant)
+          for avg_grad_pair in zip(avg_grads, avg_square_grads)]
+
+        rms_updates = [grad_rms_pair[0] / grad_rms_pair[1] for grad_rms_pair in zip(grads, rms)]
+        train = optimizer.apply_gradients(zip(rms_updates, params))
+
+        return tf.group(train, tf.group(*avg_grad_updates))
+
 
   def storeTransition(self, s, action, reward, s_, done):
     """
@@ -306,7 +350,7 @@ class Agent_DQN(Agent):
         else:
           double_q = q_batch[i][np.argmax(q_batch_now[i])]
           y = reward_batch[i] + self.gamma * double_q
-          y_batch.append(y)      
+          y_batch.append(y)
 
     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
     _, summary, loss = self.sess.run([self.logits, self.train_summary, self.loss], feed_dict={
@@ -329,7 +373,7 @@ class Agent_DQN(Agent):
     """
     Implement your training algorithm here
     """
-    pbar = tqdm(range(self.args.num_episodes))
+    pbar = tqdm(range(self.args.episode_start, self.args.num_episodes))
     current_loss = 0
     train_rewards = []
     train_episode_len = 0.0
@@ -345,7 +389,7 @@ class Agent_DQN(Agent):
       episode_reward = 0.0
       for s in range(self.args.max_num_steps):
         # self.env.env.render()
-        action = self.make_action(obs, test=False) # Performing the same action for 4 frames?
+        action = self.make_action(obs, test=False)
         obs_, reward, done, info = self.env.step(action)
         episode_reward += reward
         self.storeTransition(obs, action, reward, obs_, done)
@@ -356,7 +400,7 @@ class Agent_DQN(Agent):
 
         # once the storage stored > batch_size, start training
         if len(self.memory) > self.batch_size:
-          if self.step % self.args.update_eval == 0:
+          if self.step % self.args.update_current == 0:
             loss = self.learn()
             train_loss += loss
 
@@ -371,12 +415,13 @@ class Agent_DQN(Agent):
       train_episode_len += s
 
       if episode % self.args.num_eval == 0 and episode != 0:
+        current_loss = train_loss
         avg_reward_train = np.mean(train_rewards)
         train_rewards = []
         avg_episode_len_train = train_episode_len / float(self.args.num_eval)
         train_episode_len = 0.0
         
-        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.4f}".format(self.epsilon) + "," + "{:.2f}".format(avg_reward_train) + "," + "{:.4f}".format(train_loss) + "," + "{:.2f}".format(avg_episode_len_train) + "\n")
+        file_loss.write(str(episode) + "," + str(self.step) + "," + "{:.4f}".format(self.epsilon) + "," + "{:.2f}".format(avg_reward_train) + "," + "{:.4f}".format(current_loss) + "," + "{:.2f}".format(avg_episode_len_train) + "\n")
         file_loss.flush()
         
         print(color("\n[Train] Avg Reward: " + "{:.2f}".format(avg_reward_train) + ", Avg Episode Length: " + "{:.2f}".format(avg_episode_len_train), fg='red', bg='white'))

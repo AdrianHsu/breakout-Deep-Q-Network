@@ -1,2 +1,2 @@
-CUDA_VISIBLE_DEVICES=0 python3 main.py --train_dqn --load_saver=1 --observe_steps=0 --explore_steps=0 --num_episodes=50000 --epsilon_start=0.1
+python3 main.py --train_dqn --load_saver=1 --observe_steps=1 --explore_steps=0 --epsilon_start=0.1 --episode_start=23900
 python3 main.py --train_dqn --log_dir=logs_dueling/ --save_dir=save_dueling/ --output_logs=loss_dueling.csv --dueling=1
