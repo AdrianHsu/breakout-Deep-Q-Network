@@ -230,8 +230,8 @@ class Agent_DQN(Agent):
       self.train_summary = tf.summary.merge(self.train_summary)
     with tf.variable_scope('train'):
       #self.logits = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
-      self.logits = self.build_rmsprop_optimizer(self.lr, 0.95, 0.01, 5, 'graves_rmsprop')
-     # self.logits = self.build_rmsprop_optimizer(self.lr, 0.95, 0.01, 5, 'rmsprop')
+     # self.logits = self.build_rmsprop_optimizer(self.lr, 0.9, 1e-10, 1, 'graves_rmsprop')
+      self.logits = self.build_rmsprop_optimizer(self.lr, 0.9, 1e-10, 1, 'rmsprop')
 
   # https://github.com/Jabberwockyll/deep_rl_ale
   def build_rmsprop_optimizer(self, learning_rate, rmsprop_decay, rmsprop_constant, gradient_clip, version):
