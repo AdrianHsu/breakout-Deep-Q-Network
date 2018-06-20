@@ -15,9 +15,6 @@ tf.set_random_seed(SEED)
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
-config.gpu_options.per_process_gpu_memory_fraction = 0.4
-# config.intra_op_parallelism_threads = 1 # cpu
-# config.inter_op_parallelism_threads = 1 # cpu
 print(config)
 stages = ["[OBSERVE]", "[EXPLORE]", "[TRAIN]"]
 
@@ -220,7 +217,7 @@ class Agent_DQN(Agent):
       self.train_summary.append(tf.summary.scalar('avg_q', 
         tf.reduce_mean(self.q_eval)))
 
-      self.q_action = tf.reduce_sum(tf.multiply(self.q_eval, self.action_input), reduction_indices=1)
+      self.q_action = tf.reduce_sum(tf.multiply(self.q_eval, self.action_input), axis=1)
       self.train_summary.append(tf.summary.scalar('avg_action_q', 
         tf.reduce_mean(self.q_action)))  
 
@@ -229,9 +226,8 @@ class Agent_DQN(Agent):
 
       self.train_summary = tf.summary.merge(self.train_summary)
     with tf.variable_scope('train'):
-      #self.logits = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
-      #self.logits = self.build_rmsprop_optimizer(self.lr, 0.1, 1e-10, 1, 'graves_rmsprop')
-      self.logits = self.build_rmsprop_optimizer(self.lr, 0.9, 1e-10, 1, 'rmsprop')
+      #self.logits = self.build_rmsprop_optimizer(self.lr, 0.99, 1e-6, 1, 'graves_rmsprop')
+      self.logits = self.build_rmsprop_optimizer(self.lr, 0.99, 1e-6, 1, 'rmsprop')
 
   # https://github.com/Jabberwockyll/deep_rl_ale
   def build_rmsprop_optimizer(self, learning_rate, rmsprop_decay, rmsprop_constant, gradient_clip, version):
