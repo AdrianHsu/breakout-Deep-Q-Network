@@ -1,4 +1,4 @@
-episode,step,epsilon,reward,loss,length
+pisode,step,epsilon,reward,loss,length
 100,3204,1.0000,0.24,0.0923,31.03
 200,6527,1.0000,0.27,0.1232,32.23
 300,10095,1.0000,0.30,0.0927,34.68
