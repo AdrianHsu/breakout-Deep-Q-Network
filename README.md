@@ -1,8 +1,6 @@
 # breakout-Deep-Q-Network
 > 🏃 [Reinforcement Learning] tensorflow implementation of Deep Q Network (DQN),  Dueling DQN and Double DQN performed on Atari Breakout Game
 
-
-
 <p align=center><a target="_blank" href="https://opensource.org/licenses/MIT" title="License: MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg"></a><a target="_blank" href="http://makeapullrequest.com" title="PRs Welcome"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"></a></p>  
 
 ![gif](img/demo.gif)
@@ -66,12 +64,10 @@ Therefore I stored the `action`, `reward` in the uint8 type, and also store the 
 
 [Link](https://github.com/openai/gym/issues/401)
 
-Atari Breakout originally has following 6 action space
-`['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']`
+* Atari Breakout originally has following 6 action space`['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']`
 
-The ball in the Breakout atari game does not appear until one of `['FIRE', 'RIGHTFIRE', 'LEFTFIRE']` actions is executed.
-
-However, during training we don't need the last two, so we use action space `['NOOP', 'FIRE', 'RIGHT', 'LEFT']`
+* The ball in the Breakout atari game does not appear until one of `['FIRE', 'RIGHTFIRE', 'LEFTFIRE']` actions is executed.
+* However, during training we don't need the last two, so we use action space `['NOOP', 'FIRE', 'RIGHT', 'LEFT']`
 
 ### Main Loop
 
@@ -90,11 +86,11 @@ for episode in range(NUM_EPOISODES):
 			break
 ```
 
-### Part-by-part
+### Explanation
 
 We can refer the pseudo code to the written algorithm:
 
-> With probability $\epsilon$, select a random action $a_t$
+> With probability \epsilon, select a random action $a_t$
 >
 > otherwise select $a_t$ = max_a Q* (φ(st), a; θ)
 
@@ -156,7 +152,7 @@ for i in range(self.batch_size):
       y_batch.append(y)
 ```
 
-> Perform a gradient descent step according to equation 3
+> Perform the gradient descent step according to equation 3
 
 ```
     self.q_action = tf.reduce_sum(tf.multiply(self.q_eval, 	    
