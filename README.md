@@ -1,5 +1,7 @@
 # breakout-Deep-Q-Network
 > 🏃 [Reinforcement Learning] tensorflow implementation of Deep Q Network (DQN),  Dueling DQN and Double DQN performed on Atari Breakout Game
+>
+> 
 
 <p align=center><a target="_blank" href="https://opensource.org/licenses/MIT" title="License: MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg"></a><a target="_blank" href="http://makeapullrequest.com" title="PRs Welcome"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"></a></p>  
 
@@ -247,6 +249,26 @@ for i in range(self.batch_size):
     double_q = q_batch[i][np.argmax(q_batch_now[i])]
     y = reward_batch[i] + self.gamma * double_q
 ```
+
+
+
+#### **the learning curve**
+
+| Training Loss     | Training clipped reward |
+| ----------------- | ----------------------- |
+| ![](img/loss.png) | ![](img/reward.png)     |
+
+### Experiments
+
+
+
+| Exp 1. Model Variations                                      | Exp 2. Target Network Update Frequency                       |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![](img/model.png)                                           | ![](img/target-update.png)                                   |
+| 我做了四種 models，結果發現 dueling DQN 能夠最快開始收斂、至於 Double DQN 的效果卻不太顯著、甚至還比 natural DQN 差，然後 Dueling + Double 則是最差的。我猜想可能需要調整參數、或是 train 得還不夠久。但也可能因為 Natural DQN 在 breakout 表現很好、所以其他 model 進步空間不大。 | 我測試了 target model freeze 的時間長度，也就是每次 q_eval 用 `tf.assign()` 給 q_target 的 steps 數的間隔。結果是如果 frequency 比較高的話、他能比較快的 train 起來、但事相對的 train 的速度會被拖慢、至於 train 出來的分數好像不多，不會因為 frequency 而影響。我也有做 20000 但效果不好就沒有放。 |
+| **Exp 3. Experience Replay Memory Size**                     | **Exp 4. Gamma $\gamma$ (Discount Factor) value**            |
+| ![](img/mem.png)                                             | ![](img/gamma.png)                                           |
+| 因為原本 paper 是寫說 memory size 要設為 1,000,000，所以我花很多時間處理 RAM 記憶體問題（傳進 buffer 用 uint8 存，除以 255，等到要算 y 時再轉回 float32）。但後來發現在 breakout 這個遊戲幾乎不影響，助教也說 10000 就能夠 train 到 reward = 30000。可能是要到後期才會看出 memory 的重要、或是 breakout 遊戲長度比其他 atari 遊戲長度短。 | DQN 的 Decay Factor 會明顯影響 train 起來的效果。如果 `y = reward_batch[i] + self.gamma * np.max(q_batch[i])` 這個 gamma 越大的話，就越能考慮未來、越看重估計的 Q 未來值，如果 gamma 太小就是看得不夠遠。結果發現實驗符合理論、 gamma 太小真的會 train 不起來、而 gamma 大一點，像是 paper 上面建議的 0.99 就能有很好的表現， |
 
 
 

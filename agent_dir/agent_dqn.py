@@ -441,7 +441,7 @@ class Agent_DQN(Agent):
     q_value = self.sess.run(self.q_eval, feed_dict={self.s: state})[0]
     
     if test:
-      if random.random() <= 0.1:
+      if random.random() <= 0.025:
         return random.randrange(self.n_actions)
       return np.argmax(q_value)
 

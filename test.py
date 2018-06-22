@@ -35,12 +35,12 @@ def test(agent, env, total_episodes=30):
 
         #playing one game
         while(not done):
-         #   env.env.render()
+            #env.env.render()
             action = agent.make_action(state, test=True)
             state, reward, done, info = env.step(action)
             episode_reward += reward
         rewards.append(episode_reward)
-        print(episode_reward)
+        print('[ episode ', i, '] upclipped reward :', episode_reward)
     print('Run %d episodes'%(total_episodes))
     print('Mean:', np.mean(rewards))
 
